@@ -29,7 +29,16 @@ export async function updateSession(request: NextRequest) {
   // stay fresh. Do not add logic between createServerClient and getUser().
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  // A stale/rotated refresh token cookie (e.g. left over from testing, or
+  // a session revoked server-side) fails on every request forever unless
+  // we explicitly clear it here — getUser() alone doesn't do that.
+  if (error?.code === "refresh_token_not_found") {
+    await supabase.auth.signOut();
+    return { supabaseResponse, user: null };
+  }
 
   return { supabaseResponse, user };
 }

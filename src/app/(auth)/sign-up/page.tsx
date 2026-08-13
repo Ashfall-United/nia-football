@@ -1,26 +1,29 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { signUp, type AuthActionState } from "@/lib/auth/actions";
+import { AuthCard } from "@/components/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const initialState: AuthActionState = undefined;
 
-export default function SignUpPage() {
+function SignUpForm() {
   const [state, action, pending] = useActionState(signUp, initialState);
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "";
+  const prefilledEmail = searchParams.get("email") ?? "";
 
   return (
-    <div className="w-full max-w-sm space-y-6">
-      <div className="space-y-1 text-center">
-        <h1 className="text-lg font-semibold">Create an account</h1>
-        <p className="text-sm text-muted-foreground">
-          Set up your Nia Football account.
-        </p>
-      </div>
+    <AuthCard
+      title="Create an account"
+      description="Set up your Nia Football account."
+    >
       <form action={action} className="space-y-4">
+        {next ? <input type="hidden" name="next" value={next} /> : null}
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -28,6 +31,7 @@ export default function SignUpPage() {
             name="email"
             type="email"
             autoComplete="email"
+            defaultValue={prefilledEmail}
             required
           />
           {state?.fieldErrors?.email && (
@@ -69,6 +73,14 @@ export default function SignUpPage() {
           Sign in
         </Link>
       </p>
-    </div>
+    </AuthCard>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpForm />
+    </Suspense>
   );
 }

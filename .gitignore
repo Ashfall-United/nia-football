@@ -1,5 +1,14 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Local editor/agent tool state (.claude, .cursor, .vscode, .idea, etc.)
+# and any other root-level dotfile — never shared via the repo. Scoped to
+# the repo root (leading slash) so it doesn't touch tracked dotfiles
+# nested in the source tree (e.g. .gitkeep). Explicit exceptions below
+# for the dotfiles the project actually needs committed.
+/.*
+!/.gitignore
+!/.env.example
+
 # dependencies
 /node_modules
 /.pnp

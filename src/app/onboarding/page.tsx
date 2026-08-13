@@ -1,0 +1,16 @@
+import { requireAuthenticatedUser } from "@/lib/auth/dal";
+import { AuthCard } from "@/components/auth-card";
+import { OnboardingForm } from "./onboarding-form";
+
+export default async function OnboardingPage() {
+  await requireAuthenticatedUser();
+
+  return (
+    <AuthCard
+      title="Set up your team"
+      description="Tell us about your club or academy to get started."
+    >
+      <OnboardingForm />
+    </AuthCard>
+  );
+}
