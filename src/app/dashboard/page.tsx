@@ -19,7 +19,7 @@ export default async function DashboardPage() {
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="mb-6 space-y-2 text-center">
           <h1 className="font-heading text-3xl font-bold uppercase tracking-tight text-white sm:text-4xl">
-            Your teams
+            Select an organisation
           </h1>
           <p className="text-sm text-white/60">{user.email}</p>
         </div>

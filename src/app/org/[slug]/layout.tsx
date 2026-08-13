@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, LogOut, Shield } from "lucide-react";
+import { requireAuthenticatedUser } from "@/lib/auth/dal";
 import { requireOrganisationBySlug } from "@/domain/organisations/access";
 import { MEMBER_MANAGEMENT_ROLES, ANALYSIS_MANAGEMENT_ROLES, MEDIA_MANAGEMENT_ROLES } from "@/domain/organisations/roles";
 import { signOut } from "@/lib/auth/actions";
@@ -11,6 +12,7 @@ export default async function OrgLayout(
 ) {
   const { slug } = await props.params;
   const membership = await requireOrganisationBySlug(slug);
+  const user = await requireAuthenticatedUser();
   const showStaffNav = MEMBER_MANAGEMENT_ROLES.includes(membership.role);
   const showAnalysisNav = ANALYSIS_MANAGEMENT_ROLES.includes(membership.role);
   const showSettingsNav = MEMBER_MANAGEMENT_ROLES.includes(membership.role);
@@ -25,7 +27,7 @@ export default async function OrgLayout(
             className="mb-5 flex items-center gap-1.5 text-xs text-white/50 transition-colors hover:text-white"
           >
             <ChevronLeft className="size-3.5" />
-            All teams
+            Switch organisation
           </Link>
           <div className="flex items-center gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/10 ring-1 ring-white/10">
@@ -44,6 +46,7 @@ export default async function OrgLayout(
               <p className="truncate text-sm font-semibold text-white">
                 {membership.name}
               </p>
+              <p className="truncate text-xs text-white/50">{user.email}</p>
               <p className="text-xs capitalize text-white/50">
                 {membership.role}
               </p>
@@ -90,6 +93,9 @@ export default async function OrgLayout(
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">
                 {membership.name}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {user.email}
               </p>
               <p className="text-xs capitalize text-muted-foreground">
                 {membership.role}
