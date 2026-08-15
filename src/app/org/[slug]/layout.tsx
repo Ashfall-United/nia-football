@@ -5,7 +5,6 @@ import { requireOrganisationBySlug } from "@/domain/organisations/access";
 import { MEMBER_MANAGEMENT_ROLES, ANALYSIS_MANAGEMENT_ROLES, MEDIA_MANAGEMENT_ROLES } from "@/domain/organisations/roles";
 import { signOut } from "@/lib/auth/actions";
 import { OrgSidebarNav } from "./org-sidebar-nav";
-import { OrgSidebarRoster } from "./org-sidebar-roster";
 import { OrgMobileNav } from "./org-mobile-nav";
 
 export default async function OrgLayout(
@@ -62,8 +61,6 @@ export default async function OrgLayout(
           showSettingsNav={showSettingsNav}
           showLiveNav={showLiveNav}
         />
-
-        <OrgSidebarRoster slug={slug} />
 
         <div className="mt-auto shrink-0 border-t border-white/10 px-3 py-4 pb-6">
           <form action={signOut}>

@@ -39,10 +39,6 @@ function extractTeamId(pathname: string, slug: string): string | null {
   return match?.[1] ?? null;
 }
 
-export function extractTeamIdFromPath(pathname: string, slug: string): string | null {
-  return extractTeamId(pathname, slug);
-}
-
 export function getOrgNavSection(
   pathname: string,
   slug: string,
@@ -66,12 +62,6 @@ export function getOrgNavSection(
       backHref: `/org/${slug}/teams`,
       backLabel: "Teams",
       items: [
-        {
-          href: `/org/${slug}/teams/${teamId}`,
-          label: "Roster",
-          exact: true,
-          icon: UserRound,
-        },
         {
           href: `/org/${slug}/teams/${teamId}/sessions`,
           label: "Sessions",
@@ -105,6 +95,12 @@ export function getOrgNavSection(
         label: "Teams",
         exact: true,
         icon: Shield,
+      },
+      {
+        href: `/org/${slug}/roster`,
+        label: "Roster",
+        exact: false,
+        icon: UserRound,
       },
       {
         href: `/org/${slug}/clips`,
