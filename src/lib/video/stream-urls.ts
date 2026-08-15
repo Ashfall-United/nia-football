@@ -3,11 +3,16 @@ const CUSTOMER_CODE = process.env.NEXT_PUBLIC_CLOUDFLARE_STREAM_CUSTOMER_CODE;
 export function buildStreamThumbnailUrl(
   videoUid: string,
   height = 600,
+  timeSeconds?: number,
 ): string | null {
   if (!CUSTOMER_CODE) {
     return null;
   }
-  return `https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${videoUid}/thumbnails/thumbnail.jpg?time=&height=${height}`;
+  const time =
+    timeSeconds !== undefined && timeSeconds >= 0
+      ? `${Math.floor(timeSeconds)}s`
+      : "";
+  return `https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${videoUid}/thumbnails/thumbnail.jpg?time=${time}&height=${height}`;
 }
 
 export function buildStreamIframeSrc(

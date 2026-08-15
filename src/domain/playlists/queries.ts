@@ -151,12 +151,65 @@ export async function getPlaylistForOrganisation(
   }
 
   const clipById = new Map((clips ?? []).map((clip) => [clip.id, clip]));
+  const videoIds = [...new Set((clips ?? []).map((clip) => clip.video_id))];
+
+  const { data: videos, error: videosError } = await supabase
+    .from("videos")
+    .select("id, session_id, cloudflare_stream_uid")
+    .eq("organisation_id", organisationId)
+    .in("id", videoIds);
+
+  if (videosError) {
+    console.error("[playlists] Failed to load clip videos:", videosError);
+    throw new Error("Failed to load playlist.");
+  }
+
+  const sessionIds = [
+    ...new Set((videos ?? []).map((video) => video.session_id)),
+  ];
+
+  const { data: sessions, error: sessionsError } = await supabase
+    .from("sessions")
+    .select("id, team_id, scheduled_at")
+    .eq("organisation_id", organisationId)
+    .in("id", sessionIds);
+
+  if (sessionsError) {
+    console.error("[playlists] Failed to load clip sessions:", sessionsError);
+    throw new Error("Failed to load playlist.");
+  }
+
+  const teamIds = [...new Set((sessions ?? []).map((session) => session.team_id))];
+
+  const { data: teams, error: teamsError } = await supabase
+    .from("teams")
+    .select("id, name")
+    .eq("organisation_id", organisationId)
+    .in("id", teamIds);
+
+  if (teamsError) {
+    console.error("[playlists] Failed to load clip teams:", teamsError);
+    throw new Error("Failed to load playlist.");
+  }
+
+  const videoById = new Map((videos ?? []).map((video) => [video.id, video]));
+  const sessionById = new Map(
+    (sessions ?? []).map((session) => [session.id, session]),
+  );
+  const teamNameById = new Map(
+    (teams ?? []).map((team) => [team.id, team.name]),
+  );
 
   const items: PlaylistClipItem[] = playlistClips.flatMap((row) => {
     const clip = clipById.get(row.clip_id);
     if (!clip) {
       return [];
     }
+
+    const video = videoById.get(clip.video_id);
+    const session = video ? sessionById.get(video.session_id) : undefined;
+    const teamId = session?.team_id ?? null;
+    const teamName = teamId ? (teamNameById.get(teamId) ?? null) : null;
 
     return [
       {
@@ -167,6 +220,11 @@ export async function getPlaylistForOrganisation(
         notes: clip.notes,
         videoId: clip.video_id,
         position: row.position,
+        sessionId: video?.session_id ?? null,
+        teamId,
+        teamName,
+        sessionScheduledAt: session?.scheduled_at ?? null,
+        streamUid: video?.cloudflare_stream_uid ?? null,
       },
     ];
   });
