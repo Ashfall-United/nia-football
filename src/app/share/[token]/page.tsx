@@ -4,6 +4,7 @@ import { getSharedLinkPreview } from "@/domain/shares/queries";
 import { resolveStreamIframeSrc } from "@/services/cloudflare/playback";
 import { formatVideoTimestamp } from "@/lib/video/timestamp";
 import { AuthCard } from "@/components/auth-card";
+import { ShareDownloadButton } from "@/components/share-download-button";
 import { StreamPlayer } from "@/components/stream-player";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -62,6 +63,8 @@ export default async function SharePage({
 
         <StreamPlayer iframeSrc={iframeSrc} />
 
+        <ShareDownloadButton token={token} />
+
         {preview.notes ? (
           <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
             {preview.notes}
@@ -119,6 +122,11 @@ export default async function SharePage({
                 </div>
               </div>
               <StreamPlayer iframeSrc={clip.iframeSrc} />
+              <ShareDownloadButton
+                token={token}
+                clipIndex={index}
+                label="Download clip"
+              />
             </li>
           ))}
         </ol>

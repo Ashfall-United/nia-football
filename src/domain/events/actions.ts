@@ -34,6 +34,22 @@ export type DeleteEventActionState =
     }
   | undefined;
 
+function mapEventPersistenceError(
+  error: { code?: string; message?: string } | null,
+  action: "create" | "update",
+): string {
+  if (
+    error?.code === "22P02" &&
+    error.message?.includes("event_type")
+  ) {
+    return "Pass, tackle, and volley need the latest database migration. Run supabase db push or apply migration 20260815110000_event_type_pass_tackle_volley.sql in Supabase.";
+  }
+
+  return action === "create"
+    ? "We couldn't add this event. Try again."
+    : "We couldn't update this event. Try again.";
+}
+
 export async function createEventAction(
   slug: string,
   videoId: string,
@@ -73,7 +89,7 @@ export async function createEventAction(
 
   if (error || !event) {
     console.error("[events] Failed to create event:", error);
-    return { error: "We couldn't add this event. Try again." };
+    return { error: mapEventPersistenceError(error, "create") };
   }
 
   try {
@@ -168,7 +184,7 @@ export async function updateEventAction(
 
   if (error) {
     console.error("[events] Failed to update event:", error);
-    return { error: "We couldn't update this event. Try again." };
+    return { error: mapEventPersistenceError(error, "update") };
   }
 
   try {
