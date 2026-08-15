@@ -1,6 +1,11 @@
 import "server-only";
 import { z } from "zod";
 
+const ML_HEALTH_TIMEOUT_MS = 20_000;
+const ML_HEALTH_RETRIES = 4;
+const ML_HEALTH_RETRY_DELAY_MS = 5_000;
+const ML_DETECTION_TIMEOUT_MS = 110_000;
+
 const frameDetectionSchema = z.object({
   track_id: z.number(),
   class_name: z.string(),
@@ -33,15 +38,134 @@ export class MlServiceNotConfiguredError extends Error {
   }
 }
 
+export class MlServiceUnreachableError extends Error {
+  constructor() {
+    super("ML service is unreachable.");
+    this.name = "MlServiceUnreachableError";
+  }
+}
+
+export class MlServiceTimeoutError extends Error {
+  constructor() {
+    super("ML service request timed out.");
+    this.name = "MlServiceTimeoutError";
+  }
+}
+
+export class MlServiceUnauthorizedError extends Error {
+  constructor() {
+    super("ML service API key is invalid.");
+    this.name = "MlServiceUnauthorizedError";
+  }
+}
+
+export class MlServiceVideoError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MlServiceVideoError";
+  }
+}
+
+export class MlServiceLocalhostInProductionError extends Error {
+  constructor() {
+    super("ML service URL points to localhost in production.");
+    this.name = "MlServiceLocalhostInProductionError";
+  }
+}
+
+export const ML_SERVICE_CONFIG_HINT =
+  "Set ML_SERVICE_URL=https://nia-football.onrender.com (no /docs) and ML_API_KEY to the same value as API_KEY on the Render ML service.";
+
+function isProductionDeploy(): boolean {
+  return process.env.VERCEL === "1" || process.env.RENDER === "true";
+}
+
+function normalizeMlBaseUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, "");
+  return trimmed.replace(/\/docs\/?.*$/, "");
+}
+
 function getMlConfig(): { baseUrl: string; apiKey: string } {
-  const baseUrl = process.env.ML_SERVICE_URL?.replace(/\/$/, "");
-  const apiKey = process.env.ML_API_KEY;
+  const rawUrl = process.env.ML_SERVICE_URL;
+  const baseUrl = rawUrl ? normalizeMlBaseUrl(rawUrl) : undefined;
+  const apiKey = process.env.ML_API_KEY?.trim();
 
   if (!baseUrl || !apiKey) {
     throw new MlServiceNotConfiguredError();
   }
 
+  if (isProductionDeploy() && isLocalhostUrl(baseUrl)) {
+    throw new MlServiceLocalhostInProductionError();
+  }
+
   return { baseUrl, apiKey };
+}
+
+function isLocalhostUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new MlServiceTimeoutError();
+    }
+    throw new MlServiceUnreachableError();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function parseMlErrorDetail(body: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "detail" in parsed &&
+      typeof parsed.detail === "string"
+    ) {
+      return parsed.detail;
+    }
+  } catch {
+    return body.trim() || null;
+  }
+  return null;
+}
+
+function handleMlErrorResponse(status: number, body: string): never {
+  if (status === 401 || status === 403) {
+    throw new MlServiceUnauthorizedError();
+  }
+
+  const detail = parseMlErrorDetail(body);
+  if (status === 422 && detail) {
+    throw new MlServiceVideoError(detail);
+  }
+
+  console.error("[ml] Request failed:", status, body);
+  throw new Error("ML service request failed.");
 }
 
 export async function requestVideoDetections(options: {
@@ -51,23 +175,26 @@ export async function requestVideoDetections(options: {
 }): Promise<MlDetectionFrame[]> {
   const { baseUrl, apiKey } = getMlConfig();
 
-  const response = await fetch(`${baseUrl}/detections`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetchWithTimeout(
+    `${baseUrl}/detections`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        video_url: options.videoUrl,
+        sample_fps: options.sampleFps ?? 1,
+        max_frames: options.maxFrames ?? 60,
+      }),
     },
-    body: JSON.stringify({
-      video_url: options.videoUrl,
-      sample_fps: options.sampleFps ?? 1,
-      max_frames: options.maxFrames ?? 120,
-    }),
-  });
+    ML_DETECTION_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    console.error("[ml] Detection request failed:", response.status, body);
-    throw new Error("Detection analysis failed.");
+    handleMlErrorResponse(response.status, body);
   }
 
   const json: unknown = await response.json();
@@ -110,33 +237,36 @@ export async function requestVideoHeatmap(options: {
 }): Promise<MlHeatmapResult> {
   const { baseUrl, apiKey } = getMlConfig();
 
-  const response = await fetch(`${baseUrl}/heatmap`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetchWithTimeout(
+    `${baseUrl}/heatmap`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        video_url: options.videoUrl,
+        sample_fps: options.sampleFps ?? 1,
+        target_class: options.targetClass,
+        pitch_length_meters: options.pitchLengthMeters,
+        pitch_width_meters: options.pitchWidthMeters,
+        grid_cols: options.gridCols,
+        grid_rows: options.gridRows,
+        calibration_points: options.calibrationPoints.map((point) => ({
+          pixel_x: point.pixelX,
+          pixel_y: point.pixelY,
+          pitch_x: point.pitchX,
+          pitch_y: point.pitchY,
+        })),
+      }),
     },
-    body: JSON.stringify({
-      video_url: options.videoUrl,
-      sample_fps: options.sampleFps ?? 1,
-      target_class: options.targetClass,
-      pitch_length_meters: options.pitchLengthMeters,
-      pitch_width_meters: options.pitchWidthMeters,
-      grid_cols: options.gridCols,
-      grid_rows: options.gridRows,
-      calibration_points: options.calibrationPoints.map((point) => ({
-        pixel_x: point.pixelX,
-        pixel_y: point.pixelY,
-        pitch_x: point.pitchX,
-        pitch_y: point.pitchY,
-      })),
-    }),
-  });
+    ML_DETECTION_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    console.error("[ml] Heatmap request failed:", response.status, body);
-    throw new Error("Heatmap generation failed.");
+    handleMlErrorResponse(response.status, body);
   }
 
   const json: unknown = await response.json();
@@ -151,22 +281,64 @@ export async function requestVideoHeatmap(options: {
 }
 
 export async function checkMlServiceHealth(): Promise<boolean> {
-  try {
-    const { baseUrl } = getMlConfig();
-    const response = await fetch(`${baseUrl}/health`, {
-      next: { revalidate: 60 },
-    });
-    if (!response.ok) {
-      return false;
+  for (let attempt = 0; attempt < ML_HEALTH_RETRIES; attempt += 1) {
+    try {
+      const { baseUrl } = getMlConfig();
+      const response = await fetchWithTimeout(
+        `${baseUrl}/health`,
+        { cache: "no-store" },
+        ML_HEALTH_TIMEOUT_MS,
+      );
+      if (!response.ok) {
+        continue;
+      }
+      const json: unknown = await response.json();
+      if (
+        typeof json === "object" &&
+        json !== null &&
+        "status" in json &&
+        json.status === "ok"
+      ) {
+        return true;
+      }
+    } catch {
+      // Render free tier cold starts can take 30–60s — retry before failing.
     }
-    const json: unknown = await response.json();
-    return (
-      typeof json === "object" &&
-      json !== null &&
-      "status" in json &&
-      json.status === "ok"
-    );
-  } catch {
-    return false;
+
+    if (attempt < ML_HEALTH_RETRIES - 1) {
+      await sleep(ML_HEALTH_RETRY_DELAY_MS);
+    }
   }
+
+  return false;
+}
+
+export async function assertMlServiceReady(): Promise<void> {
+  getMlConfig();
+  const healthy = await checkMlServiceHealth();
+  if (!healthy) {
+    throw new MlServiceUnreachableError();
+  }
+}
+
+export function mapMlErrorToMessage(error: unknown): string {
+  if (error instanceof MlServiceNotConfiguredError) {
+    return `Analysis service is not configured. ${ML_SERVICE_CONFIG_HINT}`;
+  }
+  if (error instanceof MlServiceLocalhostInProductionError) {
+    return `ML_SERVICE_URL points to localhost. ${ML_SERVICE_CONFIG_HINT}`;
+  }
+  if (error instanceof MlServiceUnauthorizedError) {
+    return `ML API key rejected. ${ML_SERVICE_CONFIG_HINT}`;
+  }
+  if (error instanceof MlServiceUnreachableError) {
+    return "Analysis service is waking up or unreachable. Wait a minute and try again — Render free tier cold starts can take up to 60 seconds.";
+  }
+  if (error instanceof MlServiceTimeoutError) {
+    return "Analysis timed out. Try again with a shorter recording, or upgrade the Render ML service so it stays warm.";
+  }
+  if (error instanceof MlServiceVideoError) {
+    return `Could not read this video for analysis: ${error.message}`;
+  }
+  return "Analysis failed. Try again.";
 }

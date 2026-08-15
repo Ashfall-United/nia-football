@@ -6,6 +6,10 @@ import { requireOrganisationBySlug } from "@/domain/organisations/access";
 import { ANALYSIS_MANAGEMENT_ROLES } from "@/domain/organisations/roles";
 import { createClient } from "@/services/supabase/server";
 import {
+  isMissingSchemaError,
+  logSupabaseError,
+} from "@/lib/supabase/errors";
+import {
   createClipSchema,
   createFullRecordingClipSchema,
 } from "@/lib/validation/clip";
@@ -159,8 +163,8 @@ export async function createHighlightClipAction(
     .eq("source_event_id", eventId)
     .maybeSingle();
 
-  if (existingError) {
-    console.error(
+  if (existingError && !isMissingSchemaError(existingError)) {
+    logSupabaseError(
       "[clips] Failed to check for an existing highlight clip:",
       existingError,
     );
@@ -190,22 +194,34 @@ export async function createHighlightClipAction(
 
   const title = `${eventTypeLabelByValue.get(event.type) ?? event.type} — ${formatVideoTimestamp(event.timestampSeconds)}`;
 
-  const { data: clip, error } = await supabase
+  const insertPayload = {
+    organisation_id: membership.id,
+    video_id: videoId,
+    title,
+    start_seconds: startSeconds,
+    end_seconds: Math.max(endSeconds, startSeconds + 1),
+    source_event_id: eventId,
+    created_by: user.id,
+  };
+
+  let { data: clip, error } = await supabase
     .from("clips")
-    .insert({
-      organisation_id: membership.id,
-      video_id: videoId,
-      title,
-      start_seconds: startSeconds,
-      end_seconds: Math.max(endSeconds, startSeconds + 1),
-      source_event_id: eventId,
-      created_by: user.id,
-    })
+    .insert(insertPayload)
     .select("id")
     .single();
 
+  if (error && isMissingSchemaError(error)) {
+    const { source_event_id: _sourceEventId, ...withoutSourceEvent } =
+      insertPayload;
+    ({ data: clip, error } = await supabase
+      .from("clips")
+      .insert(withoutSourceEvent)
+      .select("id")
+      .single());
+  }
+
   if (error || !clip) {
-    console.error("[clips] Failed to create highlight clip:", error);
+    logSupabaseError("[clips] Failed to create highlight clip:", error ?? {});
     return { error: "We couldn't create this clip. Try again." };
   }
 

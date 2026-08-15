@@ -13,9 +13,11 @@ export const eventTypeGroups: EventTypeGroup[] = [
     options: [
       { value: "build_up", label: "Build-up" },
       { value: "progression", label: "Progression" },
+      { value: "pass", label: "Pass" },
       { value: "chance_creation", label: "Chance creation" },
       { value: "shot", label: "Shot" },
       { value: "goal", label: "Goal" },
+      { value: "volley", label: "Volley" },
       { value: "cross", label: "Cross" },
       { value: "third_man_action", label: "Third-man action" },
       { value: "half_space_reception", label: "Half-space reception" },
@@ -33,6 +35,7 @@ export const eventTypeGroups: EventTypeGroup[] = [
       { value: "recovery", label: "Recovery" },
       { value: "interception", label: "Interception" },
       { value: "defensive_transition", label: "Defensive transition" },
+      { value: "tackle", label: "Tackle" },
       { value: "block", label: "Block" },
     ],
   },
@@ -65,9 +68,14 @@ export const eventTypeLabelByValue = new Map(
 
 /** Common events for one-tap tagging while reviewing footage. */
 export const quickEventTypes = [
+  "pass",
+  "tackle",
+  "block",
+  "volley",
   "goal",
   "shot",
   "chance_creation",
+  "cross",
   "press",
   "counterpress",
   "foul",

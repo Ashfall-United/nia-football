@@ -9,7 +9,8 @@ import { createClient } from "@/services/supabase/server";
 import { CloudflareStreamService } from "@/services/cloudflare/stream";
 import { resolveStreamMlVideoUrl } from "@/services/cloudflare/playback";
 import {
-  MlServiceNotConfiguredError,
+  assertMlServiceReady,
+  mapMlErrorToMessage,
   requestVideoHeatmap,
 } from "@/services/ml/client";
 import { saveCalibrationSchema } from "@/lib/validation/analysis";
@@ -159,6 +160,7 @@ export async function generateHeatmapAction(
 
   let result;
   try {
+    await assertMlServiceReady();
     result = await requestVideoHeatmap({
       videoUrl,
       targetClass: target === "ball" ? "sports ball" : "person",
@@ -174,11 +176,8 @@ export async function generateHeatmapAction(
       })),
     });
   } catch (mlError) {
-    if (mlError instanceof MlServiceNotConfiguredError) {
-      return { error: "The analysis service isn't configured yet." };
-    }
     console.error("[analysis] Heatmap generation failed:", mlError);
-    return { error: "We couldn't generate this heatmap. Try again." };
+    return { error: mapMlErrorToMessage(mlError) };
   }
 
   const supabase = await createClient();

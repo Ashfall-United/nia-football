@@ -11,7 +11,7 @@ const sharedPlaylistClipPreviewSchema = z.object({
   title: z.string(),
   startSeconds: z.number(),
   endSeconds: z.number(),
-  streamUid: z.string(),
+  streamUid: z.string().min(1),
   position: z.number(),
 });
 
@@ -23,7 +23,7 @@ const sharedClipPreviewSchema = z.object({
   endSeconds: z.number(),
   notes: z.string().nullable(),
   videoId: z.string().uuid(),
-  streamUid: z.string(),
+  streamUid: z.string().min(1),
 });
 
 const sharedPlaylistPreviewSchema = z.object({

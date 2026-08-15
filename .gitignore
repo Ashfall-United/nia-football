@@ -1,10 +1,5 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Local editor/agent tool state (.claude, .cursor, .vscode, .idea, etc.)
-# and any other root-level dotfile — never shared via the repo. Scoped to
-# the repo root (leading slash) so it doesn't touch tracked dotfiles
-# nested in the source tree (e.g. .gitkeep). Explicit exceptions below
-# for the dotfiles the project actually needs committed.
 /.*
 !/.gitignore
 !/.env.example
@@ -39,8 +34,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+
 !.env.example
 
 # vercel

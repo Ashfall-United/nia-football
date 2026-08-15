@@ -79,7 +79,7 @@ export function RosterPlayerCard({
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={handleDelete}>
               <Trash2 className="size-4" />
-              Remove player
+              Remove
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

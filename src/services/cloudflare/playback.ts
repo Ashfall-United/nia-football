@@ -24,16 +24,15 @@ export async function resolveStreamMlVideoUrl(
 
 export async function resolveStreamIframeSrc(
   videoUid: string,
+  options?: { startTime?: number },
 ): Promise<string | null> {
-  const fromEnv = buildStreamIframeSrc(videoUid);
-  if (fromEnv) {
-    return fromEnv;
-  }
-
   try {
-    return await CloudflareStreamService.getVideoIframeSrc(videoUid);
+    return await CloudflareStreamService.resolvePlaybackIframeSrc(
+      videoUid,
+      options,
+    );
   } catch (error) {
     console.error("[cloudflare] Failed to resolve playback URL:", error);
-    return null;
+    return buildStreamIframeSrc(videoUid, options);
   }
 }

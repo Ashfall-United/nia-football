@@ -70,7 +70,7 @@ export function EditPlayerForm({
             }}
           />
           <Label htmlFor={`photo-${player.id}`} className="cursor-pointer">
-            Replace photo (optional)
+            Replace photo
           </Label>
           {state?.fieldErrors?.photo && (
             <p className="text-sm text-destructive">

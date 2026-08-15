@@ -25,6 +25,7 @@ export function ShareLinkButton({
   const boundAction = createShareLinkAction.bind(null, slug);
   const [state, formAction, pending] = useActionState(boundAction, initialState);
   const [copied, setCopied] = useState(false);
+  const [manualCopyUrl, setManualCopyUrl] = useState<string | null>(null);
   const lastCopiedUrl = useRef<string | null>(null);
 
   useEffect(() => {
@@ -34,14 +35,25 @@ export function ShareLinkButton({
     }
 
     lastCopiedUrl.current = shareUrl;
-    void navigator.clipboard.writeText(shareUrl).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2500);
-    });
+    setManualCopyUrl(null);
+
+    void navigator.clipboard.writeText(shareUrl).then(
+      () => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2500);
+      },
+      () => {
+        setManualCopyUrl(shareUrl);
+      },
+    );
   }, [state?.success?.shareUrl]);
 
   return (
-    <form action={formAction}>
+    <form
+      action={formAction}
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
       <input type="hidden" name="resourceType" value={resourceType} />
       <input type="hidden" name="resourceId" value={resourceId} />
       <Button type="submit" size="sm" variant="outline" disabled={pending}>
@@ -55,7 +67,13 @@ export function ShareLinkButton({
         {pending ? "Creating…" : copied ? "Link copied" : label}
       </Button>
       {state?.error ? (
-        <p className="mt-2 text-sm text-destructive">{state.error}</p>
+        <p className="mt-2 max-w-xs text-sm text-destructive">{state.error}</p>
+      ) : null}
+      {manualCopyUrl ? (
+        <p className="mt-2 max-w-xs break-all text-xs text-muted-foreground">
+          Copy this link:{" "}
+          <span className="font-mono text-foreground">{manualCopyUrl}</span>
+        </p>
       ) : null}
     </form>
   );

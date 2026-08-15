@@ -26,12 +26,18 @@ export const ANALYSIS_MANAGEMENT_ROLES: OrganisationRole[] = [
   "analyst",
 ];
 
-// Playlists and public share links match migration RLS: coaches can curate
-// and share, but analysts/media/viewers are read-only inside the org.
+// Playlists match migration RLS: coaches can curate, analysts can share clips.
 export const PLAYLIST_MANAGEMENT_ROLES: OrganisationRole[] = [
   "owner",
   "admin",
   "coach",
+];
+
+export const SHARE_MANAGEMENT_ROLES: OrganisationRole[] = [
+  "owner",
+  "admin",
+  "coach",
+  "analyst",
 ];
 
 // Inviting, removing, and changing organisation roles is restricted to

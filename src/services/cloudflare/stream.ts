@@ -1,6 +1,9 @@
 import "server-only";
 import { z } from "zod";
-import { buildStreamHlsUrl } from "@/lib/video/stream-urls";
+import {
+  buildStreamHlsUrl,
+  buildStreamIframeSrc,
+} from "@/lib/video/stream-urls";
 import { cloudflareFetch, CloudflareApiError } from "./client";
 
 export type StreamLiveInput = {
@@ -205,6 +208,70 @@ async function getVideoIframeSrc(uid: string): Promise<string | null> {
   return null;
 }
 
+function buildSignedIframeSrc(
+  token: string,
+  options?: { startTime?: number },
+): string | null {
+  const customerCode = process.env.NEXT_PUBLIC_CLOUDFLARE_STREAM_CUSTOMER_CODE;
+  if (!customerCode) {
+    return null;
+  }
+
+  const base = `https://customer-${customerCode}.cloudflarestream.com/${token}`;
+  const poster = `${base}/thumbnails/thumbnail.jpg?time=&height=600`;
+  let iframe = `${base}/iframe?poster=${encodeURIComponent(poster)}`;
+
+  if (options?.startTime !== undefined && options.startTime > 0) {
+    iframe += `&startTime=${Math.floor(options.startTime)}`;
+  }
+
+  return iframe;
+}
+
+function appendStartTimeToIframe(
+  iframeSrc: string,
+  startTime?: number,
+): string {
+  if (startTime === undefined || startTime <= 0) {
+    return iframeSrc;
+  }
+
+  const url = new URL(iframeSrc);
+  url.searchParams.set("startTime", String(Math.floor(startTime)));
+  return url.toString();
+}
+
+async function resolvePlaybackIframeSrc(
+  uid: string,
+  options?: { startTime?: number },
+): Promise<string | null> {
+  const parsed = await getVideoDetails(uid);
+
+  if (parsed.success && parsed.data.requireSignedURLs === true) {
+    try {
+      const token = await createSignedStreamToken(uid);
+      const signed = buildSignedIframeSrc(token, options);
+      if (signed) {
+        return signed;
+      }
+    } catch (error) {
+      console.error("[cloudflare] Failed to create signed playback token:", error);
+    }
+  }
+
+  const fromEnv = buildStreamIframeSrc(uid, options);
+  if (fromEnv) {
+    return fromEnv;
+  }
+
+  const fromApi = await getVideoIframeSrc(uid);
+  if (!fromApi) {
+    return null;
+  }
+
+  return appendStartTimeToIframe(fromApi, options?.startTime);
+}
+
 const streamTokenResponseSchema = z.union([
   z.object({ token: z.string().min(1) }),
   z.string().min(1),
@@ -271,4 +338,5 @@ export const CloudflareStreamService = {
   getVideoDuration,
   getVideoDimensions,
   resolveMlVideoUrl,
+  resolvePlaybackIframeSrc,
 };

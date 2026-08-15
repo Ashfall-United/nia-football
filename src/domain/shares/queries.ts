@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/services/supabase/server";
+import { isMissingSchemaError, logSupabaseError } from "@/lib/supabase/errors";
 import {
   sharedLinkExpiredSchema,
   sharedLinkPreviewSchema,
@@ -21,7 +22,13 @@ export async function getSharedLinkPreview(
   });
 
   if (error) {
-    console.error("[shares] Failed to load share preview:", error);
+    if (isMissingSchemaError(error)) {
+      console.error(
+        "[shares] Share preview unavailable — apply pending Supabase migrations (playlists_shares_and_usage).",
+      );
+      return null;
+    }
+    logSupabaseError("[shares] Failed to load share preview:", error);
     throw new Error("Failed to load share link.");
   }
 
@@ -36,7 +43,10 @@ export async function getSharedLinkPreview(
 
   const parsed = sharedLinkPreviewSchema.safeParse(data);
   if (!parsed.success) {
-    console.error("[shares] Invalid share preview payload:", parsed.error);
+    logSupabaseError("[shares] Invalid share preview payload:", {
+      message: parsed.error.message,
+    });
+    console.error("[shares] Raw share preview payload:", data);
     return null;
   }
 

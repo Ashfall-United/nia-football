@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarDays, Film, Play, Users, Video } from "lucide-react";
 import type { ClipWithContext } from "@/domain/clips/types";
 import type { VideoWithContext } from "@/domain/videos/types";
+import { formatDisplayDate } from "@/lib/format/date";
 import { buildVideoPageHref } from "@/lib/video/routes";
 import { cn } from "@/lib/utils";
 import { ClipShareButton } from "./clip-share-button";
@@ -25,11 +26,7 @@ function clipDurationSeconds(clip: Pick<ClipWithContext, "startSeconds" | "endSe
 }
 
 function formatSessionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatDisplayDate(iso);
 }
 
 export function ClipCard({
@@ -50,15 +47,12 @@ export function ClipCard({
   );
   const duration = formatTimestamp(clipDurationSeconds(clip));
   const sessionDate = formatSessionDate(clip.sessionScheduledAt);
-  const createdDate = new Date(clip.createdAt).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const createdDate = formatDisplayDate(clip.createdAt);
 
   return (
-    <Link href={href} className="group/card relative block h-full">
-      <article className="relative flex aspect-[4/3] flex-col overflow-hidden rounded-xl bg-[#011a45] shadow-md ring-1 ring-black/5 transition-shadow hover:shadow-lg">
+    <div className="group/card relative block h-full">
+      <Link href={href} className="block h-full">
+        <article className="relative flex aspect-[4/3] flex-col overflow-hidden rounded-xl bg-[#011a45] shadow-md ring-1 ring-black/5 transition-shadow hover:shadow-lg">
         <Film
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-1/2 size-36 -translate-x-1/2 -translate-y-[55%] text-white/[0.07] transition-transform duration-300 group-hover/card:scale-110"
@@ -107,8 +101,9 @@ export function ClipCard({
           </div>
         </div>
       </article>
+      </Link>
       <ClipShareButton slug={slug} clipId={clip.id} />
-    </Link>
+    </div>
   );
 }
 
@@ -123,11 +118,7 @@ export function RecordingCard({
 }) {
   const href = `/org/${slug}/teams/${video.teamId}/sessions/${video.sessionId}/videos/${video.id}`;
   const duration = formatDuration(video.durationSeconds);
-  const recordedDate = new Date(video.createdAt).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const recordedDate = formatDisplayDate(video.createdAt);
 
   return (
     <Link href={href} className="group/card block h-full">

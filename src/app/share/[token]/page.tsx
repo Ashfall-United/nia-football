@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Film, ListMusic } from "lucide-react";
 import { getSharedLinkPreview } from "@/domain/shares/queries";
-import { buildStreamIframeSrc } from "@/services/cloudflare/playback";
+import { resolveStreamIframeSrc } from "@/services/cloudflare/playback";
 import { formatVideoTimestamp } from "@/lib/video/timestamp";
 import { AuthCard } from "@/components/auth-card";
 import { StreamPlayer } from "@/components/stream-player";
@@ -43,7 +43,7 @@ export default async function SharePage({
   }
 
   if (preview.resourceType === "clip") {
-    const iframeSrc = buildStreamIframeSrc(preview.streamUid, {
+    const iframeSrc = await resolveStreamIframeSrc(preview.streamUid, {
       startTime: preview.startSeconds,
     });
 
@@ -71,6 +71,15 @@ export default async function SharePage({
     );
   }
 
+  const clipsWithPlayback = await Promise.all(
+    preview.clips.map(async (clip) => ({
+      ...clip,
+      iframeSrc: await resolveStreamIframeSrc(clip.streamUid, {
+        startTime: clip.startSeconds,
+      }),
+    })),
+  );
+
   return (
     <div className="space-y-8">
       <header className="space-y-2 text-center text-white">
@@ -88,36 +97,30 @@ export default async function SharePage({
         ) : null}
       </header>
 
-      {preview.clips.length > 0 ? (
+      {clipsWithPlayback.length > 0 ? (
         <ol className="space-y-8">
-          {preview.clips.map((clip, index) => {
-            const iframeSrc = buildStreamIframeSrc(clip.streamUid, {
-              startTime: clip.startSeconds,
-            });
-
-            return (
-              <li
-                key={`${clip.position}-${clip.title}`}
-                className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f5c400]/20 text-sm font-semibold tabular-nums text-[#f5c400]">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <p className="font-heading text-lg font-semibold uppercase tracking-wide text-white">
-                      {clip.title}
-                    </p>
-                    <p className="mt-1 font-mono text-xs tabular-nums text-white/60">
-                      {formatVideoTimestamp(clip.startSeconds)}–
-                      {formatVideoTimestamp(clip.endSeconds)}
-                    </p>
-                  </div>
+          {clipsWithPlayback.map((clip, index) => (
+            <li
+              key={`${clip.position}-${clip.title}`}
+              className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f5c400]/20 text-sm font-semibold tabular-nums text-[#f5c400]">
+                  {index + 1}
+                </span>
+                <div>
+                  <p className="font-heading text-lg font-semibold uppercase tracking-wide text-white">
+                    {clip.title}
+                  </p>
+                  <p className="mt-1 font-mono text-xs tabular-nums text-white/60">
+                    {formatVideoTimestamp(clip.startSeconds)}–
+                    {formatVideoTimestamp(clip.endSeconds)}
+                  </p>
                 </div>
-                <StreamPlayer iframeSrc={iframeSrc} />
-              </li>
-            );
-          })}
+              </div>
+              <StreamPlayer iframeSrc={clip.iframeSrc} />
+            </li>
+          ))}
         </ol>
       ) : (
         <AuthCard

@@ -3,10 +3,12 @@
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useActionState } from "react";
-import { Clock, Pencil, Trash2 } from "lucide-react";
+import { Clock, Check, Pencil, Trash2, X } from "lucide-react";
 import {
   saveEventAction,
   deleteEventAction,
+  confirmEventAction,
+  rejectEventAction,
   type CreateEventActionState,
 } from "@/domain/events/actions";
 import type { Event } from "@/domain/events/types";
@@ -17,6 +19,7 @@ import {
   eventTypeGroups,
   eventTypeLabelByValue,
   eventTypeOptions,
+  quickEventTypes,
 } from "@/lib/validation/event";
 import {
   formatVideoTimestamp,
@@ -93,7 +96,9 @@ export function VideoAnalysisWorkspace({
   const [tagging, setTagging] = useState(() => emptyTaggingState());
   const [clientError, setClientError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [isDeleting, startDelete] = useTransition();
+  const [isReviewing, startReview] = useTransition();
 
   const boundSaveAction = saveEventAction.bind(null, slug, videoId);
   const [formState, formAction, pending] = useActionState(
@@ -150,6 +155,30 @@ export function VideoAnalysisWorkspace({
       }
       if (tagging.editingEventId === eventId) {
         resetTagging();
+      }
+      router.refresh();
+    });
+  }
+
+  function handleConfirm(eventId: string) {
+    setReviewError(null);
+    startReview(async () => {
+      const result = await confirmEventAction(slug, eventId);
+      if (result?.error) {
+        setReviewError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleReject(eventId: string) {
+    setReviewError(null);
+    startReview(async () => {
+      const result = await rejectEventAction(slug, eventId);
+      if (result?.error) {
+        setReviewError(result.error);
+        return;
       }
       router.refresh();
     });
@@ -242,6 +271,32 @@ export function VideoAnalysisWorkspace({
               ))}
 
               <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Quick tag</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {quickEventTypes.map((type) => {
+                      const label = eventTypeLabelByValue.get(type) ?? type;
+                      const isSelected = tagging.eventType === type;
+                      return (
+                        <Button
+                          key={type}
+                          type="button"
+                          size="sm"
+                          variant={isSelected ? "default" : "outline"}
+                          onClick={() =>
+                            setTagging((current) => ({
+                              ...current,
+                              eventType: type,
+                            }))
+                          }
+                        >
+                          {label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="event-type">Event type</Label>
                   <Select
@@ -366,6 +421,10 @@ export function VideoAnalysisWorkspace({
           <p className="text-sm text-destructive">{deleteError}</p>
         )}
 
+        {reviewError && (
+          <p className="text-sm text-destructive">{reviewError}</p>
+        )}
+
         {events.length > 0 ? (
           <ul className="divide-y divide-border overflow-hidden rounded-xl border bg-card shadow-sm">
             {events.map((event) => {
@@ -432,25 +491,52 @@ export function VideoAnalysisWorkspace({
 
                     {canAnalyze && (
                       <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`Edit ${label}`}
-                          onClick={() => startEdit(event)}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`Delete ${label}`}
-                          disabled={isDeleting}
-                          onClick={() => handleDelete(event.id)}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
+                        {event.reviewStatus === "suggested" ? (
+                          <>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={`Reject ${label}`}
+                              disabled={isReviewing}
+                              onClick={() => handleReject(event.id)}
+                            >
+                              <X className="size-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={`Confirm ${label}`}
+                              disabled={isReviewing}
+                              onClick={() => handleConfirm(event.id)}
+                            >
+                              <Check className="size-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={`Edit ${label}`}
+                              onClick={() => startEdit(event)}
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              aria-label={`Delete ${label}`}
+                              disabled={isDeleting}
+                              onClick={() => handleDelete(event.id)}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

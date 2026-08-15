@@ -13,7 +13,8 @@ import { createEventSchema, updateEventSchema, eventTypeLabelByValue } from "@/l
 import { resolveStreamMlVideoUrl } from "@/services/cloudflare/playback";
 import { CloudflareApiError } from "@/services/cloudflare/client";
 import {
-  MlServiceNotConfiguredError,
+  assertMlServiceReady,
+  mapMlErrorToMessage,
   requestVideoDetections,
 } from "@/services/ml/client";
 import { listEventsForVideo, getEventForOrganisation } from "./queries";
@@ -438,13 +439,11 @@ export async function runBallDetectionSuggestionsAction(
 
   let frames;
   try {
+    await assertMlServiceReady();
     frames = await requestVideoDetections({ videoUrl });
   } catch (error) {
-    if (error instanceof MlServiceNotConfiguredError) {
-      return { skipped: true, created: 0 };
-    }
     console.error("[events] Ball detection failed:", error);
-    return { error: "Detection analysis failed. Try again." };
+    return { error: mapMlErrorToMessage(error) };
   }
 
   const existingEvents = await listEventsForVideo(membership.id, videoId);
@@ -495,7 +494,10 @@ export async function runBallDetectionSuggestionsAction(
 
   if (error) {
     console.error("[events] Failed to insert suggested events:", error);
-    return { error: "We couldn't save suggested events. Try again." };
+    return {
+      error:
+        "We couldn't save suggested events. Check that the events table exists (run supabase db push).",
+    };
   }
 
   revalidatePath(`/org/${slug}`);

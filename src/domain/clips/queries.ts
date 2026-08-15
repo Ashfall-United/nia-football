@@ -1,11 +1,14 @@
 import "server-only";
 import { createClient } from "@/services/supabase/server";
+import { isMissingSchemaError, logSupabaseError } from "@/lib/supabase/errors";
 import type { Clip, ClipWithContext } from "./types";
 
 const CLIPS_PAGE_SIZE = 50;
 
-const CLIP_COLUMNS =
+const CLIP_COLUMNS_BASE =
   "id, organisation_id, video_id, title, start_seconds, end_seconds, notes, created_by, created_at";
+
+const CLIP_COLUMNS_WITH_SOURCE = `${CLIP_COLUMNS_BASE}, source_event_id`;
 
 type ClipRow = {
   id: string;
@@ -20,7 +23,7 @@ type ClipRow = {
   source_event_id?: string | null;
 };
 
-function mapClipRow(clip: ClipRow) {
+function mapClipRow(clip: ClipRow): Clip {
   return {
     id: clip.id,
     organisationId: clip.organisation_id,
@@ -41,19 +44,33 @@ export async function listClipsForVideo(
 ): Promise<Clip[]> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("clips")
-    .select(CLIP_COLUMNS)
+    .select(CLIP_COLUMNS_WITH_SOURCE)
     .eq("organisation_id", organisationId)
     .eq("video_id", videoId)
     .order("start_seconds");
 
+  let rows = primary.data as ClipRow[] | null;
+  let error = primary.error;
+
+  if (error && isMissingSchemaError(error)) {
+    const fallback = await supabase
+      .from("clips")
+      .select(CLIP_COLUMNS_BASE)
+      .eq("organisation_id", organisationId)
+      .eq("video_id", videoId)
+      .order("start_seconds");
+    rows = fallback.data as ClipRow[] | null;
+    error = fallback.error;
+  }
+
   if (error) {
-    console.error("[clips] Failed to load clips:", error);
+    logSupabaseError("[clips] Failed to load clips:", error);
     throw new Error("Failed to load clips.");
   }
 
-  return (data ?? []).map(mapClipRow);
+  return (rows ?? []).map(mapClipRow);
 }
 
 export async function listClipsForVideos(
@@ -66,19 +83,33 @@ export async function listClipsForVideos(
 
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("clips")
-    .select(CLIP_COLUMNS)
+    .select(CLIP_COLUMNS_WITH_SOURCE)
     .eq("organisation_id", organisationId)
     .in("video_id", [...videoIds])
     .order("start_seconds");
 
+  let rows = primary.data as ClipRow[] | null;
+  let error = primary.error;
+
+  if (error && isMissingSchemaError(error)) {
+    const fallback = await supabase
+      .from("clips")
+      .select(CLIP_COLUMNS_BASE)
+      .eq("organisation_id", organisationId)
+      .in("video_id", [...videoIds])
+      .order("start_seconds");
+    rows = fallback.data as ClipRow[] | null;
+    error = fallback.error;
+  }
+
   if (error) {
-    console.error("[clips] Failed to load clips for videos:", error);
+    logSupabaseError("[clips] Failed to load clips for videos:", error);
     throw new Error("Failed to load clips.");
   }
 
-  return (data ?? []).map(mapClipRow);
+  return (rows ?? []).map(mapClipRow);
 }
 
 export async function listClipsForOrganisation(
@@ -86,23 +117,37 @@ export async function listClipsForOrganisation(
 ): Promise<ClipWithContext[]> {
   const supabase = await createClient();
 
-  const { data: clips, error: clipsError } = await supabase
+  const primary = await supabase
     .from("clips")
-    .select(CLIP_COLUMNS)
+    .select(CLIP_COLUMNS_WITH_SOURCE)
     .eq("organisation_id", organisationId)
     .order("created_at", { ascending: false })
     .limit(CLIPS_PAGE_SIZE);
 
+  let clipRows = primary.data as ClipRow[] | null;
+  let clipsError = primary.error;
+
+  if (clipsError && isMissingSchemaError(clipsError)) {
+    const fallback = await supabase
+      .from("clips")
+      .select(CLIP_COLUMNS_BASE)
+      .eq("organisation_id", organisationId)
+      .order("created_at", { ascending: false })
+      .limit(CLIPS_PAGE_SIZE);
+    clipRows = fallback.data as ClipRow[] | null;
+    clipsError = fallback.error;
+  }
+
   if (clipsError) {
-    console.error("[clips] Failed to load organisation clips:", clipsError);
+    logSupabaseError("[clips] Failed to load organisation clips:", clipsError);
     throw new Error("Failed to load clips.");
   }
 
-  if (!clips || clips.length === 0) {
+  if (!clipRows || clipRows.length === 0) {
     return [];
   }
 
-  const videoIds = [...new Set(clips.map((clip) => clip.video_id))];
+  const videoIds = [...new Set(clipRows.map((clip) => clip.video_id))];
 
   const { data: videos, error: videosError } = await supabase
     .from("videos")
@@ -111,7 +156,7 @@ export async function listClipsForOrganisation(
     .in("id", videoIds);
 
   if (videosError) {
-    console.error("[clips] Failed to load clip videos:", videosError);
+    logSupabaseError("[clips] Failed to load clip videos:", videosError);
     throw new Error("Failed to load clips.");
   }
 
@@ -124,7 +169,7 @@ export async function listClipsForOrganisation(
     .in("id", sessionIds);
 
   if (sessionsError) {
-    console.error("[clips] Failed to load clip sessions:", sessionsError);
+    logSupabaseError("[clips] Failed to load clip sessions:", sessionsError);
     throw new Error("Failed to load clips.");
   }
 
@@ -136,7 +181,7 @@ export async function listClipsForOrganisation(
     .in("id", teamIds);
 
   if (teamsError) {
-    console.error("[clips] Failed to load clip teams:", teamsError);
+    logSupabaseError("[clips] Failed to load clip teams:", teamsError);
     throw new Error("Failed to load clips.");
   }
 
@@ -150,7 +195,7 @@ export async function listClipsForOrganisation(
     (teams ?? []).map((team) => [team.id, team.name]),
   );
 
-  return clips.flatMap((clip) => {
+  return clipRows.flatMap((clip) => {
     const sessionId = sessionByVideoId.get(clip.video_id);
     const session = sessionId ? sessionById.get(sessionId) : undefined;
     const teamId = session?.team_id;
