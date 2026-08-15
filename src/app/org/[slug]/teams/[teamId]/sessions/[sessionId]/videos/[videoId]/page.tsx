@@ -123,12 +123,6 @@ export default async function VideoPage(
     photoUrl: photoUrls.get(p.photoPath),
     jerseyNumber: p.jerseyNumber,
   }));
-  const playerNameById = Object.fromEntries(
-    playerOptions.map((p) => [p.id, p.name]),
-  );
-  const playerPhotoById = Object.fromEntries(
-    playerOptions.map((p) => [p.id, p.photoUrl]),
-  );
 
   const highlightEventTypeSet = new Set<string>(highlightEventTypes);
   const clippedEventIds = new Set(
@@ -172,8 +166,6 @@ export default async function VideoPage(
           playerIds: event.playerIds,
           reviewStatus: event.reviewStatus,
         }))}
-        playerNameById={playerNameById}
-        playerPhotoById={playerPhotoById}
       />
 
       {canAnalyze && (

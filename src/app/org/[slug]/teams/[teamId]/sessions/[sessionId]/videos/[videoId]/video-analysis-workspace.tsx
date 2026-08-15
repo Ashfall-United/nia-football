@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useActionState } from "react";
-import { Clock, Check, Pencil, Trash2, X } from "lucide-react";
+import { Clock, Check, Trash2, X } from "lucide-react";
 import {
   saveEventAction,
   deleteEventAction,
@@ -28,7 +28,6 @@ import {
 import { useActionSuccess } from "@/hooks/use-action-success";
 import { InteractiveStreamPlayer } from "@/components/interactive-stream-player";
 import {
-  PlayerAvatar,
   PlayerMultiSelect,
   type PlayerOption,
 } from "@/components/player-multi-select";
@@ -73,8 +72,6 @@ export function VideoAnalysisWorkspace({
   canAnalyze,
   players,
   events,
-  playerNameById,
-  playerPhotoById,
 }: {
   slug: string;
   videoId: string;
@@ -83,8 +80,6 @@ export function VideoAnalysisWorkspace({
   canAnalyze: boolean;
   players: PlayerOption[];
   events: VideoEvent[];
-  playerNameById: Record<string, string>;
-  playerPhotoById: Record<string, string | undefined>;
 }) {
   const playerBridgeRef = useRef<{
     getCurrentTimestamp: () => number;
@@ -93,6 +88,7 @@ export function VideoAnalysisWorkspace({
   const router = useRouter();
 
   const [liveTime, setLiveTime] = useState(0);
+  const [tagFormExpanded, setTagFormExpanded] = useState(false);
   const [tagging, setTagging] = useState(() => emptyTaggingState());
   const [clientError, setClientError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -107,6 +103,10 @@ export function VideoAnalysisWorkspace({
   );
 
   const isEditing = tagging.editingEventId !== null;
+  const editingEvent = isEditing
+    ? events.find((event) => event.id === tagging.editingEventId)
+    : null;
+  const isEditingSuggested = editingEvent?.reviewStatus === "suggested";
 
   const resetTagging = useCallback((timestamp?: number) => {
     const seconds =
@@ -120,6 +120,7 @@ export function VideoAnalysisWorkspace({
     Boolean(formState?.error || formState?.fieldErrors),
     () => {
       resetTagging();
+      setTagFormExpanded(false);
       router.refresh();
     },
   );
@@ -142,6 +143,7 @@ export function VideoAnalysisWorkspace({
       notes: event.notes ?? "",
       editingEventId: event.id,
     });
+    setTagFormExpanded(true);
     setClientError(null);
   }
 
@@ -234,7 +236,12 @@ export function VideoAnalysisWorkspace({
 
         {canAnalyze && (
           <section className="rounded-xl border bg-card p-5 shadow-sm sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4 border-b border-border pb-4">
+            <div
+              className={cn(
+                "flex flex-wrap items-start justify-between gap-4",
+                tagFormExpanded && "border-b border-border pb-4",
+              )}
+            >
               <div className="space-y-1">
                 <h3 className="font-heading text-base font-semibold uppercase tracking-wide">
                   {isEditing ? "Edit event" : "Tag an event"}
@@ -243,22 +250,37 @@ export function VideoAnalysisWorkspace({
                   Watch the video, mark the moment, keep going.
                 </p>
               </div>
-              {isEditing && (
+              <div className="flex shrink-0 items-center gap-2">
+                {tagFormExpanded && isEditing && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => resetTagging()}
+                  >
+                    Cancel
+                  </Button>
+                )}
                 <Button
                   type="button"
                   size="sm"
-                  variant="ghost"
-                  onClick={() => resetTagging()}
+                  variant="outline"
+                  onClick={() => setTagFormExpanded((current) => !current)}
                 >
-                  Cancel
+                  {tagFormExpanded
+                    ? "Hide tagging"
+                    : isEditing
+                      ? "Edit event"
+                      : "Tag an event"}
                 </Button>
-              )}
+              </div>
             </div>
 
+            {tagFormExpanded && (
             <form
               action={formAction}
               onSubmit={handleSubmit}
-              className="space-y-5"
+              className="mt-5 space-y-5"
             >
               {tagging.editingEventId && (
                 <input
@@ -416,7 +438,54 @@ export function VideoAnalysisWorkspace({
                 </p>
               )}
 
-              <div className="flex justify-end border-t border-border pt-4">
+              {isEditingSuggested && (
+                <p className="text-sm text-amber-700">
+                  {eventReviewStatusLabelByValue.get("suggested")} — confirm or
+                  reject this AI-detected moment.
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                {isEditing && tagging.editingEventId ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isEditingSuggested ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isReviewing}
+                          onClick={() => handleReject(tagging.editingEventId!)}
+                        >
+                          <X className="size-3.5" />
+                          Reject
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={isReviewing}
+                          onClick={() => handleConfirm(tagging.editingEventId!)}
+                        >
+                          <Check className="size-3.5" />
+                          Confirm
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={isDeleting}
+                        onClick={() => handleDelete(tagging.editingEventId!)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <span />
+                )}
                 <Button type="submit" disabled={pending}>
                   {pending
                     ? "Saving…"
@@ -426,6 +495,7 @@ export function VideoAnalysisWorkspace({
                 </Button>
               </div>
             </form>
+            )}
           </section>
         )}
 
@@ -435,133 +505,6 @@ export function VideoAnalysisWorkspace({
 
         {reviewError && (
           <p className="text-sm text-destructive">{reviewError}</p>
-        )}
-
-        {events.length > 0 ? (
-          <ul className="divide-y divide-border overflow-hidden rounded-xl border bg-card shadow-sm">
-            {events.map((event) => {
-              const label =
-                eventTypeLabelByValue.get(event.type) ?? event.type;
-              const isActive = tagging.editingEventId === event.id;
-
-              return (
-                <li key={event.id}>
-                  <div
-                    className={cn(
-                      "flex items-start gap-3 px-4 py-3.5 text-sm transition-colors sm:px-5",
-                      isActive && "bg-primary/5",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        playerBridgeRef.current?.seek(event.timestampSeconds)
-                      }
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <p className="font-medium">{label}</p>
-                          {event.reviewStatus === "suggested" ? (
-                            <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                              {eventReviewStatusLabelByValue.get("suggested")}
-                            </span>
-                          ) : null}
-                        </div>
-                        <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 font-mono text-xs tabular-nums text-primary">
-                          {formatVideoTimestamp(event.timestampSeconds)}
-                        </span>
-                      </div>
-
-                      {event.playerIds.length > 0 && (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {event.playerIds.map((id) => (
-                            <span
-                              key={id}
-                              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-                            >
-                              <PlayerAvatar
-                                name={playerNameById[id] ?? "Unknown"}
-                                photoUrl={playerPhotoById[id]}
-                                size="sm"
-                              />
-                              {playerNameById[id] ?? "Unknown"}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {event.notes && (
-                        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
-                          {event.notes}
-                        </p>
-                      )}
-                      <p className="mt-2 text-[11px] text-muted-foreground/80">
-                        Tap to jump to this moment
-                      </p>
-                    </button>
-
-                    {canAnalyze && (
-                      <div className="flex shrink-0 items-center gap-1">
-                        {event.reviewStatus === "suggested" ? (
-                          <>
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label={`Reject ${label}`}
-                              disabled={isReviewing}
-                              onClick={() => handleReject(event.id)}
-                            >
-                              <X className="size-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label={`Confirm ${label}`}
-                              disabled={isReviewing}
-                              onClick={() => handleConfirm(event.id)}
-                            >
-                              <Check className="size-3.5" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label={`Edit ${label}`}
-                              onClick={() => startEdit(event)}
-                            >
-                              <Pencil className="size-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label={`Delete ${label}`}
-                              disabled={isDeleting}
-                              onClick={() => handleDelete(event.id)}
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-            {canAnalyze
-              ? "No events yet. Use the panel above while you watch to tag key moments."
-              : "An owner, admin, coach, or analyst hasn't tagged any events yet."}
-          </div>
         )}
       </div>
     </div>
