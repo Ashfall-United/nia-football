@@ -24,6 +24,11 @@ export type PlaylistClipItem = {
   notes: string | null;
   videoId: string;
   position: number;
+  teamId: string | null;
+  sessionId: string | null;
+  teamName: string | null;
+  sessionScheduledAt: string | null;
+  streamUid: string | null;
 };
 
 export type PlaylistWithClips = Playlist & {
