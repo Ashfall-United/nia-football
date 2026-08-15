@@ -201,6 +201,10 @@ export function VideoAnalysisWorkspace({
 
   const parsedTimestamp = parseVideoTimestampInput(tagging.timestampInput);
 
+  const sortedTimelineEvents = [...events].sort(
+    (a, b) => a.timestampSeconds - b.timestampSeconds,
+  );
+
   return (
     <div className="space-y-6">
       <InteractiveStreamPlayer
@@ -208,6 +212,14 @@ export function VideoAnalysisWorkspace({
         initialSeekSeconds={initialSeekSeconds}
         onTimeUpdate={setLiveTime}
         playerBridgeRef={playerBridgeRef}
+        timelineEvents={sortedTimelineEvents}
+        activeTimelineEventId={tagging.editingEventId}
+        onTimelineEventClick={(timelineEvent) => {
+          const match = events.find((item) => item.id === timelineEvent.id);
+          if (match) {
+            startEdit(match);
+          }
+        }}
       />
 
       <div className="space-y-4">

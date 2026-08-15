@@ -39,8 +39,8 @@ export class MlServiceNotConfiguredError extends Error {
 }
 
 export class MlServiceUnreachableError extends Error {
-  constructor() {
-    super("ML service is unreachable.");
+  constructor(message?: string) {
+    super(message ?? "ML service is unreachable.");
     this.name = "MlServiceUnreachableError";
   }
 }
@@ -159,6 +159,12 @@ function handleMlErrorResponse(status: number, body: string): never {
     throw new MlServiceUnauthorizedError();
   }
 
+  if (status === 502 || status === 503 || status === 504) {
+    throw new MlServiceUnreachableError(
+      "Analysis service ran out of memory or restarted mid-request. On Render, upgrade nia-football-ml to the Standard plan (2 GB RAM) and redeploy.",
+    );
+  }
+
   const detail = parseMlErrorDetail(body);
   if (status === 422 && detail) {
     throw new MlServiceVideoError(detail);
@@ -186,7 +192,7 @@ export async function requestVideoDetections(options: {
       body: JSON.stringify({
         video_url: options.videoUrl,
         sample_fps: options.sampleFps ?? 1,
-        max_frames: options.maxFrames ?? 60,
+        max_frames: options.maxFrames ?? 24,
       }),
     },
     ML_DETECTION_TIMEOUT_MS,
@@ -332,7 +338,7 @@ export function mapMlErrorToMessage(error: unknown): string {
     return `ML API key rejected. ${ML_SERVICE_CONFIG_HINT}`;
   }
   if (error instanceof MlServiceUnreachableError) {
-    return "Analysis service is waking up or unreachable. Wait a minute and try again — Render free tier cold starts can take up to 60 seconds.";
+    return error.message;
   }
   if (error instanceof MlServiceTimeoutError) {
     return "Analysis timed out. Try again with a shorter recording, or upgrade the Render ML service so it stays warm.";
