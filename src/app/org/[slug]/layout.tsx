@@ -5,6 +5,7 @@ import { requireOrganisationBySlug } from "@/domain/organisations/access";
 import { MEMBER_MANAGEMENT_ROLES, ANALYSIS_MANAGEMENT_ROLES, MEDIA_MANAGEMENT_ROLES } from "@/domain/organisations/roles";
 import { signOut } from "@/lib/auth/actions";
 import { OrgSidebarNav } from "./org-sidebar-nav";
+import { OrgSidebarRoster } from "./org-sidebar-roster";
 import { OrgMobileNav } from "./org-mobile-nav";
 
 export default async function OrgLayout(
@@ -20,7 +21,7 @@ export default async function OrgLayout(
 
   return (
     <div className="flex min-h-svh w-full flex-1 bg-muted/30">
-      <aside className="hidden w-64 shrink-0 flex-col bg-[#01255f] text-white lg:flex">
+      <aside className="hidden min-h-svh w-64 shrink-0 flex-col bg-[#01255f] text-white lg:flex">
         <div className="border-b border-white/10 px-4 py-5">
           <Link
             href="/dashboard"
@@ -62,7 +63,9 @@ export default async function OrgLayout(
           showLiveNav={showLiveNav}
         />
 
-        <div className="mt-auto border-t border-white/10 px-3 py-4 pb-6">
+        <OrgSidebarRoster slug={slug} />
+
+        <div className="mt-auto shrink-0 border-t border-white/10 px-3 py-4 pb-6">
           <form action={signOut}>
             <button
               type="submit"

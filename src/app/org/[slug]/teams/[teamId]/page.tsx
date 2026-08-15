@@ -2,17 +2,15 @@ import { notFound } from "next/navigation";
 import { Plus, UserRound } from "lucide-react";
 import { requireOrganisationBySlug } from "@/domain/organisations/access";
 import { ROSTER_MANAGEMENT_ROLES } from "@/domain/organisations/roles";
-import { getTeamForOrganisation } from "@/domain/teams/queries";
+import { getTeamForOrganisation, listTeamsForOrganisation } from "@/domain/teams/queries";
 import {
   listPlayersForTeam,
   getPlayerPhotoUrls,
 } from "@/domain/players/queries";
-import { EmptyState } from "@/components/empty-state";
 import { FormDialog } from "@/components/form-dialog";
 import { PageHeader, PageShell } from "@/components/page-shell";
 import { CreatePlayerForm } from "./create-player-form";
-import { PlayerCard, PlayerCardGrid } from "./player-card";
-import { RosterPlayerCard } from "./roster-player-card";
+import { RosterView } from "./roster-view";
 
 export default async function TeamPage(
   props: PageProps<"/org/[slug]/teams/[teamId]">,
@@ -25,9 +23,15 @@ export default async function TeamPage(
     notFound();
   }
 
+  const teams = await listTeamsForOrganisation(membership.id);
   const players = await listPlayersForTeam(membership.id, teamId);
   const photoUrls = await getPlayerPhotoUrls(players.map((p) => p.photoPath));
   const canManageRoster = ROSTER_MANAGEMENT_ROLES.includes(membership.role);
+
+  const rosterPlayers = players.map((player) => ({
+    ...player,
+    photoUrl: photoUrls.get(player.photoPath),
+  }));
 
   return (
     <PageShell>
@@ -49,37 +53,13 @@ export default async function TeamPage(
         }
       />
 
-      {players.length > 0 ? (
-        <PlayerCardGrid>
-          {players.map((player) => (
-            <li key={player.id}>
-              {canManageRoster ? (
-                <RosterPlayerCard
-                  slug={slug}
-                  teamId={teamId}
-                  player={player}
-                  photoUrl={photoUrls.get(player.photoPath)}
-                />
-              ) : (
-                <PlayerCard
-                  player={player}
-                  photoUrl={photoUrls.get(player.photoPath)}
-                />
-              )}
-            </li>
-          ))}
-        </PlayerCardGrid>
-      ) : (
-        <EmptyState
-          icon={UserRound}
-          title="No players yet"
-          description={
-            canManageRoster
-              ? "Use the Add player button above to start building this team's roster."
-              : "An owner, admin, or coach hasn't added any players yet."
-          }
-        />
-      )}
+      <RosterView
+        slug={slug}
+        teamId={teamId}
+        teams={teams}
+        players={rosterPlayers}
+        canManageRoster={canManageRoster}
+      />
     </PageShell>
   );
 }

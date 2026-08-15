@@ -42,6 +42,7 @@ export function FormDialog({
   title,
   description,
   wide = false,
+  triggerClassName,
   children,
 }: {
   triggerLabel: string;
@@ -49,6 +50,7 @@ export function FormDialog({
   title: string;
   description?: string;
   wide?: boolean;
+  triggerClassName?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -58,7 +60,7 @@ export function FormDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="sm">
+          <Button size="sm" className={triggerClassName}>
             {triggerIcon}
             {triggerLabel}
           </Button>

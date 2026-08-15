@@ -39,6 +39,10 @@ function extractTeamId(pathname: string, slug: string): string | null {
   return match?.[1] ?? null;
 }
 
+export function extractTeamIdFromPath(pathname: string, slug: string): string | null {
+  return extractTeamId(pathname, slug);
+}
+
 export function getOrgNavSection(
   pathname: string,
   slug: string,
@@ -196,7 +200,7 @@ export function OrgSidebarNav({
   });
 
   return (
-    <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
+    <nav className="flex shrink-0 flex-col gap-1 px-3 py-4">
       {section.backHref && (
         <Link
           href={section.backHref}
