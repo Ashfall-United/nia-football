@@ -4,5 +4,5 @@ export default async function TeamPage(
   props: PageProps<"/org/[slug]/teams/[teamId]">,
 ) {
   const { slug, teamId } = await props.params;
-  redirect(`/org/${slug}/roster?team=${teamId}`);
+  redirect(`/org/${slug}/teams/${teamId}/sessions`);
 }

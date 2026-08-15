@@ -63,7 +63,7 @@ export function TeamCard({
 
   return (
     <Link
-      href={`/org/${slug}/roster?team=${team.id}`}
+      href={`/org/${slug}/teams/${team.id}/sessions`}
       className="group/card block h-full"
     >
       <article className="relative flex min-h-[280px] flex-col overflow-hidden rounded-2xl bg-[#01255f] shadow-md ring-1 ring-black/5 transition-shadow hover:shadow-lg sm:min-h-[320px]">
